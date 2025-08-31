@@ -20,7 +20,7 @@
             overflow: hidden;
         }
         
-        /* Registration Screen */
+        /* Registration/Login Screen */
         .registration {
             display: flex;
             flex-direction: column;
@@ -35,6 +35,16 @@
             font-size: 3rem;
             margin-bottom: 2rem;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        #authForm {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(255,255,255,0.1);
+            padding: 2rem;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
         }
         
         .registration input {
@@ -58,10 +68,22 @@
             cursor: pointer;
             font-weight: bold;
             transition: transform 0.2s;
+            margin-bottom: 1rem;
         }
         
         .registration button:hover {
             transform: scale(1.05);
+        }
+        
+        .registration p {
+            margin: 1rem 0;
+            color: rgba(255,255,255,0.9);
+        }
+        
+        .registration .secondary-btn {
+            background: transparent;
+            color: #fff;
+            border: 2px solid #fff;
         }
         
         /* Main App */
@@ -91,21 +113,42 @@
         }
         
         .sidebar-header h2 {
-            font-size: 1.5rem;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
         
-        .new-chat-btn {
-            width: 40px;
-            height: 40px;
+        .user-menu {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .new-chat-btn, .logout-btn {
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             background: #667eea;
             border: none;
             color: white;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: background 0.2s;
+        }
+        
+        .logout-btn {
+            background: #dc3545;
+        }
+        
+        .new-chat-btn:hover {
+            background: #5a6edb;
+        }
+        
+        .logout-btn:hover {
+            background: #c82333;
         }
         
         .search-bar {
@@ -177,6 +220,18 @@
         
         .conversation-time {
             color: #888;
+            font-size: 0.8rem;
+        }
+        
+        .unread-badge {
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 0.8rem;
         }
         
@@ -559,11 +614,16 @@
     </style>
 </head>
 <body>
-    <!-- Registration Screen -->
+    <!-- Registration/Login Screen -->
     <div class="registration" id="registrationScreen">
         <h1>🔒 Secure Messenger</h1>
-        <input type="text" id="usernameInput" placeholder="Choose a username" maxlength="20">
-        <button onclick="register()">Get Started</button>
+        <div id="authForm">
+            <input type="text" id="usernameInput" placeholder="Username" maxlength="20">
+            <input type="password" id="passwordInput" placeholder="Password">
+            <button id="authButton" onclick="register()">Register</button>
+            <p id="authToggleText">Already have an account?</p>
+            <button class="secondary-btn" id="authToggleButton" onclick="showLogin()">Login</button>
+        </div>
     </div>
     
     <!-- Main App -->
@@ -571,8 +631,14 @@
         <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h2 id="currentUsername">Chats</h2>
-                <button class="new-chat-btn" onclick="showNewChatModal()">+</button>
+                <h2>
+                    <span>👤</span>
+                    <span id="currentUsername">Username</span>
+                </h2>
+                <div class="user-menu">
+                    <button class="new-chat-btn" onclick="showNewChatModal()" title="New Chat">+</button>
+                    <button class="logout-btn" onclick="logout()" title="Logout">⬈</button>
+                </div>
             </div>
             <div class="search-bar">
                 <input type="text" placeholder="Search conversations..." id="searchInput">
@@ -594,8 +660,8 @@
                     </div>
                 </div>
                 <div class="chat-actions">
-                    <button class="chat-action-btn" onclick="showSafetyNumber()">🔐</button>
-                    <button class="chat-action-btn" onclick="showChatSettings()">⚙️</button>
+                    <button class="chat-action-btn" onclick="showSafetyNumber()" title="Safety Number">🔐</button>
+                    <button class="chat-action-btn" onclick="showChatSettings()" title="Settings">⚙️</button>
                 </div>
             </div>
             
@@ -611,9 +677,9 @@
             </div>
             
             <div class="input-area" id="inputArea" style="display: none;">
-                <button class="attach-btn">📎</button>
+                <button class="attach-btn" title="Attach">📎</button>
                 <input type="text" class="message-input" id="messageInput" placeholder="Type a message...">
-                <button class="send-btn" onclick="sendMessage()">➤</button>
+                <button class="send-btn" onclick="sendMessage()" title="Send">➤</button>
             </div>
         </div>
     </div>
@@ -673,13 +739,14 @@
         let messenger = null;
         let currentConversation = null;
         let chatType = 'direct';
+        let isLoginMode = false;
         
         // Initialize
         async function init() {
             messenger = new SecureMessenger();
-            const isRegistered = await messenger.init();
+            const isLoggedIn = await messenger.init();
             
-            if (isRegistered) {
+            if (isLoggedIn) {
                 showApp();
                 document.getElementById('currentUsername').textContent = messenger.username;
                 loadConversations();
@@ -705,20 +772,78 @@
         // Registration
         async function register() {
             const username = document.getElementById('usernameInput').value.trim();
-            if (!username) {
-                showStatus('Please enter a username');
+            const password = document.getElementById('passwordInput').value;
+            
+            if (!username || !password) {
+                showStatus('Please enter username and password');
+                return;
+            }
+            
+            if (password.length < 8) {
+                showStatus('Password must be at least 8 characters');
                 return;
             }
             
             try {
-                showStatus('Registering...');
-                await messenger.register(username);
+                showStatus('Creating account...');
+                await messenger.register(username, password);
                 showApp();
                 document.getElementById('currentUsername').textContent = username;
-                showStatus('Registration successful!');
+                showStatus('Account created successfully!');
+                loadConversations();
             } catch (error) {
                 showStatus('Registration failed: ' + error.message);
             }
+        }
+        
+        // Login
+        async function login() {
+            const username = document.getElementById('usernameInput').value.trim();
+            const password = document.getElementById('passwordInput').value;
+            
+            if (!username || !password) {
+                showStatus('Please enter username and password');
+                return;
+            }
+            
+            try {
+                showStatus('Logging in...');
+                await messenger.login(username, password);
+                showApp();
+                document.getElementById('currentUsername').textContent = username;
+                showStatus('Logged in successfully!');
+                loadConversations();
+            } catch (error) {
+                showStatus('Login failed: ' + error.message);
+            }
+        }
+        
+        // Logout
+        async function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                await messenger.logout();
+                showRegistration();
+                showStatus('Logged out successfully');
+            }
+        }
+        
+        // Toggle between login and register
+        function showLogin() {
+            isLoginMode = true;
+            document.getElementById('authButton').textContent = 'Login';
+            document.getElementById('authButton').onclick = login;
+            document.getElementById('authToggleText').textContent = 'Need an account?';
+            document.getElementById('authToggleButton').textContent = 'Register';
+            document.getElementById('authToggleButton').onclick = showRegister;
+        }
+        
+        function showRegister() {
+            isLoginMode = false;
+            document.getElementById('authButton').textContent = 'Register';
+            document.getElementById('authButton').onclick = register;
+            document.getElementById('authToggleText').textContent = 'Already have an account?';
+            document.getElementById('authToggleButton').textContent = 'Login';
+            document.getElementById('authToggleButton').onclick = showLogin;
         }
         
         // Show/Hide Screens
@@ -748,16 +873,27 @@
             // Add direct conversations
             conversations.forEach(conv => {
                 if (!conv.id.startsWith('group_')) {
-                    const item = createConversationItem(conv.id, conv.id, 'Direct message', false);
+                    const item = createConversationItem(
+                        conv.id, 
+                        conv.name || conv.id, 
+                        conv.lastMessage || 'Start a conversation',
+                        false,
+                        conv.unreadCount
+                    );
                     list.appendChild(item);
                 }
             });
         }
         
-        function createConversationItem(id, name, preview, isGroup) {
+        function createConversationItem(id, name, preview, isGroup, unreadCount) {
             const div = document.createElement('div');
             div.className = 'conversation-item';
             div.onclick = () => selectConversation(id, name, isGroup);
+            
+            let unreadBadge = '';
+            if (unreadCount > 0) {
+                unreadBadge = `<span class="unread-badge">${unreadCount}</span>`;
+            }
             
             div.innerHTML = `
                 <div class="conversation-avatar">${isGroup ? '👥' : name[0].toUpperCase()}</div>
@@ -765,7 +901,7 @@
                     <div class="conversation-name">${name}</div>
                     <div class="conversation-preview">${preview}</div>
                 </div>
-                <div class="conversation-time"></div>
+                ${unreadBadge}
             `;
             
             return div;
@@ -928,6 +1064,10 @@
             closeSafetyModal();
         }
         
+        function showChatSettings() {
+            showStatus('Settings coming soon...');
+        }
+        
         // Utility Functions
         function showStatus(message) {
             const bar = document.getElementById('statusBar');
@@ -956,8 +1096,12 @@
             if (e.key === 'Enter' && document.activeElement.id === 'messageInput') {
                 sendMessage();
             }
-            if (e.key === 'Enter' && document.activeElement.id === 'usernameInput') {
-                register();
+            if (e.key === 'Enter' && document.activeElement.id === 'passwordInput') {
+                if (isLoginMode) {
+                    login();
+                } else {
+                    register();
+                }
             }
         });
         

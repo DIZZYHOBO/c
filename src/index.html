@@ -1,146 +1,968 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Secure Messenger</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #000;
-      color: #fff;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    
-    .header {
-      background: #1c1c1c;
-      padding: 1rem;
-      border-bottom: 1px solid #333;
-    }
-    
-    .messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
-    }
-    
-    .message {
-      margin: 0.5rem 0;
-      padding: 0.75rem;
-      border-radius: 18px;
-      max-width: 70%;
-    }
-    
-    .message.sent {
-      background: #0084ff;
-      margin-left: auto;
-    }
-    
-    .message.received {
-      background: #333;
-    }
-    
-    .input-area {
-      display: flex;
-      padding: 1rem;
-      background: #1c1c1c;
-      border-top: 1px solid #333;
-    }
-    
-    input {
-      flex: 1;
-      background: #000;
-      border: 1px solid #333;
-      color: #fff;
-      padding: 0.75rem;
-      border-radius: 24px;
-      outline: none;
-    }
-    
-    button {
-      background: #0084ff;
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 24px;
-      margin-left: 0.5rem;
-      cursor: pointer;
-    }
-    
-    .safety-number {
-      background: #1c1c1c;
-      padding: 0.5rem;
-      border-radius: 8px;
-      font-family: monospace;
-      text-align: center;
-      margin: 1rem 0;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Signal Messenger</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #000;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        /* Registration Screen */
+        .registration {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .registration h1 {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .registration input {
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 30px;
+            width: 300px;
+            margin-bottom: 1rem;
+            background: rgba(255,255,255,0.9);
+            color: #333;
+        }
+        
+        .registration button {
+            padding: 1rem 3rem;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 30px;
+            background: #fff;
+            color: #667eea;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        
+        .registration button:hover {
+            transform: scale(1.05);
+        }
+        
+        /* Main App */
+        .app {
+            display: none;
+            width: 100%;
+            height: 100%;
+            flex-direction: row;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            width: 350px;
+            background: #1c1c1c;
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar-header {
+            padding: 1rem;
+            background: #2a2a2a;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .sidebar-header h2 {
+            font-size: 1.5rem;
+        }
+        
+        .new-chat-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #667eea;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .search-bar {
+            padding: 0.5rem 1rem;
+            background: #1c1c1c;
+            border-bottom: 1px solid #333;
+        }
+        
+        .search-bar input {
+            width: 100%;
+            padding: 0.5rem;
+            background: #2a2a2a;
+            border: 1px solid #333;
+            border-radius: 20px;
+            color: #fff;
+            outline: none;
+        }
+        
+        .conversations-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .conversation-item {
+            padding: 1rem;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+        }
+        
+        .conversation-item:hover {
+            background: #2a2a2a;
+        }
+        
+        .conversation-item.active {
+            background: #667eea;
+        }
+        
+        .conversation-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-right: 1rem;
+        }
+        
+        .conversation-info {
+            flex: 1;
+        }
+        
+        .conversation-name {
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+        
+        .conversation-preview {
+            color: #aaa;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .conversation-time {
+            color: #888;
+            font-size: 0.8rem;
+        }
+        
+        /* Chat Area */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #0a0a0a;
+        }
+        
+        .chat-header {
+            padding: 1rem;
+            background: #1c1c1c;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .chat-header-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .chat-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+        }
+        
+        .chat-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .chat-status {
+            font-size: 0.9rem;
+            color: #888;
+        }
+        
+        .chat-actions {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .chat-action-btn {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+        
+        /* Messages */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .message {
+            max-width: 70%;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .message.sent {
+            align-self: flex-end;
+        }
+        
+        .message.received {
+            align-self: flex-start;
+        }
+        
+        .message-bubble {
+            padding: 0.75rem 1rem;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+        }
+        
+        .message.sent .message-bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.received .message-bubble {
+            background: #2a2a2a;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .message-time {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 0.25rem;
+            align-self: flex-end;
+        }
+        
+        .message.sent .message-time {
+            align-self: flex-end;
+        }
+        
+        .message.received .message-time {
+            align-self: flex-start;
+        }
+        
+        /* Input Area */
+        .input-area {
+            padding: 1rem;
+            background: #1c1c1c;
+            border-top: 1px solid #333;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .attach-btn {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        
+        .message-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: #2a2a2a;
+            border: 1px solid #333;
+            border-radius: 24px;
+            color: #fff;
+            outline: none;
+            font-size: 1rem;
+        }
+        
+        .send-btn {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        
+        .send-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        /* Safety Number Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: #1c1c1c;
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        
+        .safety-number {
+            background: #2a2a2a;
+            padding: 1.5rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.2rem;
+            text-align: center;
+            word-spacing: 0.5rem;
+            line-height: 2;
+            margin-bottom: 1rem;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+        
+        .modal-btn {
+            padding: 0.75rem 2rem;
+            border-radius: 24px;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+        
+        .modal-btn.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .modal-btn.secondary {
+            background: #2a2a2a;
+            color: white;
+        }
+        
+        .modal-btn:hover {
+            opacity: 0.8;
+        }
+        
+        /* New Chat Modal */
+        .new-chat-modal .modal-content {
+            max-width: 400px;
+        }
+        
+        .new-chat-input {
+            width: 100%;
+            padding: 0.75rem;
+            background: #2a2a2a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            margin-bottom: 1rem;
+            outline: none;
+        }
+        
+        .chat-type-selector {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .chat-type-btn {
+            flex: 1;
+            padding: 0.75rem;
+            background: #2a2a2a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .chat-type-btn.active {
+            background: #667eea;
+            border-color: #667eea;
+        }
+        
+        /* Status Bar */
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #667eea;
+            color: white;
+            padding: 0.5rem 1rem;
+            text-align: center;
+            transform: translateY(100%);
+            transition: transform 0.3s;
+            z-index: 999;
+        }
+        
+        .status-bar.show {
+            transform: translateY(0);
+        }
+        
+        /* Typing Indicator */
+        .typing-indicator {
+            display: none;
+            padding: 0.5rem 1rem;
+            color: #888;
+            font-style: italic;
+        }
+        
+        .typing-indicator.show {
+            display: block;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #888;
+        }
+        
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        
+        .empty-state-text {
+            font-size: 1.2rem;
+        }
+        
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid #333;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: absolute;
+                z-index: 10;
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .chat-area {
+                width: 100%;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+            }
+        }
+        
+        @media (min-width: 769px) {
+            .mobile-menu-btn {
+                display: none;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="header">
-    <h3 id="chat-title">Secure Chat</h3>
-    <div id="safety-number" class="safety-number" style="display:none;"></div>
-  </div>
-  
-  <div class="messages" id="messages"></div>
-  
-  <div class="input-area">
-    <input type="text" id="message-input" placeholder="Type a message...">
-    <button onclick="sendMessage()">Send</button>
-  </div>
-  
-  <script src="/crypto/signal-protocol.js"></script>
-  <script src="/app.js"></script>
-  <script>
-    const messenger = new SecureMessenger();
+    <!-- Registration Screen -->
+    <div class="registration" id="registrationScreen">
+        <h1>🔒 Secure Messenger</h1>
+        <input type="text" id="usernameInput" placeholder="Choose a username" maxlength="20">
+        <button onclick="register()">Get Started</button>
+    </div>
     
-    async function init() {
-      // Check if registered
-      const identity = await messenger.db.getIdentity();
-      if (!identity) {
-        const username = prompt("Choose a username:");
-        await messenger.register(username);
-      } else {
-        messenger.userId = identity.userId;
-        messenger.startPolling();
-      }
-    }
+    <!-- Main App -->
+    <div class="app" id="appScreen">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2 id="currentUsername">Chats</h2>
+                <button class="new-chat-btn" onclick="showNewChatModal()">+</button>
+            </div>
+            <div class="search-bar">
+                <input type="text" placeholder="Search conversations..." id="searchInput">
+            </div>
+            <div class="conversations-list" id="conversationsList">
+                <!-- Conversations will be added here -->
+            </div>
+        </div>
+        
+        <!-- Chat Area -->
+        <div class="chat-area">
+            <div class="chat-header" id="chatHeader" style="display: none;">
+                <button class="mobile-menu-btn chat-action-btn" onclick="toggleSidebar()">☰</button>
+                <div class="chat-header-info">
+                    <div class="chat-avatar" id="chatAvatar">U</div>
+                    <div>
+                        <div class="chat-name" id="chatName">Select a chat</div>
+                        <div class="chat-status" id="chatStatus">Click on a conversation to start</div>
+                    </div>
+                </div>
+                <div class="chat-actions">
+                    <button class="chat-action-btn" onclick="showSafetyNumber()">🔐</button>
+                    <button class="chat-action-btn" onclick="showChatSettings()">⚙️</button>
+                </div>
+            </div>
+            
+            <div class="messages-container" id="messagesContainer">
+                <div class="empty-state">
+                    <div class="empty-state-icon">💬</div>
+                    <div class="empty-state-text">Select a conversation to start messaging</div>
+                </div>
+            </div>
+            
+            <div class="typing-indicator" id="typingIndicator">
+                <span id="typingUser">Someone</span> is typing...
+            </div>
+            
+            <div class="input-area" id="inputArea" style="display: none;">
+                <button class="attach-btn">📎</button>
+                <input type="text" class="message-input" id="messageInput" placeholder="Type a message...">
+                <button class="send-btn" onclick="sendMessage()">➤</button>
+            </div>
+        </div>
+    </div>
     
-    async function sendMessage() {
-      const input = document.getElementById('message-input');
-      const text = input.value.trim();
-      if (!text) return;
-      
-      // For demo, you'd select recipient
-      const recipientId = getCurrentRecipientId();
-      await messenger.sendMessage(recipientId, text);
-      
-      // Add to UI
-      addMessageToUI(text, true);
-      input.value = '';
-    }
+    <!-- Safety Number Modal -->
+    <div class="modal" id="safetyModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Safety Number</div>
+                <button class="modal-close" onclick="closeSafetyModal()">✕</button>
+            </div>
+            <div class="safety-number" id="safetyNumber">
+                Loading...
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn primary" onclick="verifySafetyNumber()">Mark as Verified</button>
+                <button class="modal-btn secondary" onclick="closeSafetyModal()">Close</button>
+            </div>
+        </div>
+    </div>
     
-    function addMessageToUI(text, sent) {
-      const messagesDiv = document.getElementById('messages');
-      const messageDiv = document.createElement('div');
-      messageDiv.className = `message ${sent ? 'sent' : 'received'}`;
-      messageDiv.textContent = text;
-      messagesDiv.appendChild(messageDiv);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
+    <!-- New Chat Modal -->
+    <div class="modal new-chat-modal" id="newChatModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">New Conversation</div>
+                <button class="modal-close" onclick="closeNewChatModal()">✕</button>
+            </div>
+            <div class="chat-type-selector">
+                <button class="chat-type-btn active" onclick="selectChatType('direct')">Direct Message</button>
+                <button class="chat-type-btn" onclick="selectChatType('group')">Group Chat</button>
+            </div>
+            <div id="directChatForm">
+                <input type="text" class="new-chat-input" id="newChatUsername" placeholder="Enter username">
+            </div>
+            <div id="groupChatForm" style="display: none;">
+                <input type="text" class="new-chat-input" id="groupName" placeholder="Group name">
+                <input type="text" class="new-chat-input" id="groupMembers" placeholder="Members (comma separated)">
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn primary" onclick="startNewChat()">Start Chat</button>
+                <button class="modal-btn secondary" onclick="closeNewChatModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
     
-    messenger.onMessageReceived = (text, senderId) => {
-      addMessageToUI(text, false);
-      
-      // Show notification if page not visible
-      if (document.hidden && 'Notification' in window) {
-        new Notification('New Message', { body: text });
-      }
-    };
+    <!-- Status Bar -->
+    <div class="status-bar" id="statusBar">
+        <span id="statusMessage">Connecting...</span>
+    </div>
     
-    init();
-  </script>
+    <!-- Load Scripts -->
+    <script src="signal-protocol.js"></script>
+    <script src="app.js"></script>
+    <script>
+        // UI State
+        let messenger = null;
+        let currentConversation = null;
+        let chatType = 'direct';
+        
+        // Initialize
+        async function init() {
+            messenger = new SecureMessenger();
+            const isRegistered = await messenger.init();
+            
+            if (isRegistered) {
+                showApp();
+                document.getElementById('currentUsername').textContent = messenger.username;
+                loadConversations();
+            } else {
+                showRegistration();
+            }
+            
+            // Set up message handler
+            messenger.onMessageReceived = (text, senderId, groupId) => {
+                if (groupId && currentConversation === groupId) {
+                    addMessageToUI(text, false, senderId);
+                } else if (!groupId && currentConversation === senderId) {
+                    addMessageToUI(text, false, senderId);
+                }
+                loadConversations();
+            };
+            
+            messenger.onStatusUpdate = (message) => {
+                showStatus(message);
+            };
+        }
+        
+        // Registration
+        async function register() {
+            const username = document.getElementById('usernameInput').value.trim();
+            if (!username) {
+                showStatus('Please enter a username');
+                return;
+            }
+            
+            try {
+                showStatus('Registering...');
+                await messenger.register(username);
+                showApp();
+                document.getElementById('currentUsername').textContent = username;
+                showStatus('Registration successful!');
+            } catch (error) {
+                showStatus('Registration failed: ' + error.message);
+            }
+        }
+        
+        // Show/Hide Screens
+        function showRegistration() {
+            document.getElementById('registrationScreen').style.display = 'flex';
+            document.getElementById('appScreen').style.display = 'none';
+        }
+        
+        function showApp() {
+            document.getElementById('registrationScreen').style.display = 'none';
+            document.getElementById('appScreen').style.display = 'flex';
+        }
+        
+        // Load Conversations
+        async function loadConversations() {
+            const conversations = await messenger.getConversations();
+            const groups = await messenger.getGroups();
+            const list = document.getElementById('conversationsList');
+            list.innerHTML = '';
+            
+            // Add groups
+            groups.forEach(group => {
+                const item = createConversationItem(group.groupId, group.name, 'Group chat', true);
+                list.appendChild(item);
+            });
+            
+            // Add direct conversations
+            conversations.forEach(conv => {
+                if (!conv.id.startsWith('group_')) {
+                    const item = createConversationItem(conv.id, conv.id, 'Direct message', false);
+                    list.appendChild(item);
+                }
+            });
+        }
+        
+        function createConversationItem(id, name, preview, isGroup) {
+            const div = document.createElement('div');
+            div.className = 'conversation-item';
+            div.onclick = () => selectConversation(id, name, isGroup);
+            
+            div.innerHTML = `
+                <div class="conversation-avatar">${isGroup ? '👥' : name[0].toUpperCase()}</div>
+                <div class="conversation-info">
+                    <div class="conversation-name">${name}</div>
+                    <div class="conversation-preview">${preview}</div>
+                </div>
+                <div class="conversation-time"></div>
+            `;
+            
+            return div;
+        }
+        
+        // Select Conversation
+        async function selectConversation(id, name, isGroup) {
+            currentConversation = id;
+            
+            // Update UI
+            document.getElementById('chatName').textContent = name;
+            document.getElementById('chatStatus').textContent = isGroup ? 'Group chat' : 'Direct message';
+            document.getElementById('chatAvatar').textContent = isGroup ? '👥' : name[0].toUpperCase();
+            document.getElementById('chatHeader').style.display = 'flex';
+            document.getElementById('inputArea').style.display = 'flex';
+            
+            // Mark active
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            // Load messages
+            await loadMessages(id);
+            
+            // Hide sidebar on mobile
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('show');
+            }
+        }
+        
+        // Load Messages
+        async function loadMessages(conversationId) {
+            const container = document.getElementById('messagesContainer');
+            container.innerHTML = '<div class="spinner"></div>';
+            
+            const messages = await messenger.getMessages(conversationId);
+            container.innerHTML = '';
+            
+            messages.forEach(msg => {
+                addMessageToUI(msg.text, msg.sent, msg.senderId);
+            });
+            
+            scrollToBottom();
+        }
+        
+        // Send Message
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            
+            if (!text || !currentConversation) return;
+            
+            try {
+                if (currentConversation.startsWith('group_')) {
+                    await messenger.sendGroupMessage(currentConversation, text);
+                } else {
+                    await messenger.sendMessage(currentConversation, text);
+                }
+                
+                addMessageToUI(text, true);
+                input.value = '';
+                scrollToBottom();
+            } catch (error) {
+                showStatus('Failed to send message: ' + error.message);
+            }
+        }
+        
+        // Add Message to UI
+        function addMessageToUI(text, sent, senderId) {
+            const container = document.getElementById('messagesContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sent ? 'sent' : 'received'}`;
+            
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            messageDiv.innerHTML = `
+                <div class="message-bubble">${escapeHtml(text)}</div>
+                <div class="message-time">${time}</div>
+            `;
+            
+            container.appendChild(messageDiv);
+        }
+        
+        // New Chat Modal
+        function showNewChatModal() {
+            document.getElementById('newChatModal').style.display = 'flex';
+        }
+        
+        function closeNewChatModal() {
+            document.getElementById('newChatModal').style.display = 'none';
+        }
+        
+        function selectChatType(type) {
+            chatType = type;
+            document.querySelectorAll('.chat-type-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            if (type === 'direct') {
+                document.getElementById('directChatForm').style.display = 'block';
+                document.getElementById('groupChatForm').style.display = 'none';
+            } else {
+                document.getElementById('directChatForm').style.display = 'none';
+                document.getElementById('groupChatForm').style.display = 'block';
+            }
+        }
+        
+        async function startNewChat() {
+            try {
+                if (chatType === 'direct') {
+                    const username = document.getElementById('newChatUsername').value.trim();
+                    if (!username) return;
+                    
+                    await selectConversation(username, username, false);
+                    closeNewChatModal();
+                } else {
+                    const groupName = document.getElementById('groupName').value.trim();
+                    const members = document.getElementById('groupMembers').value.split(',').map(m => m.trim());
+                    
+                    if (!groupName || members.length === 0) return;
+                    
+                    showStatus('Creating group...');
+                    const groupId = await messenger.createGroup(groupName, members);
+                    await loadConversations();
+                    await selectConversation(groupId, groupName, true);
+                    closeNewChatModal();
+                    showStatus('Group created!');
+                }
+            } catch (error) {
+                showStatus('Error: ' + error.message);
+            }
+        }
+        
+        // Safety Number Modal
+        async function showSafetyNumber() {
+            if (!currentConversation || currentConversation.startsWith('group_')) {
+                showStatus('Safety numbers are for direct messages only');
+                return;
+            }
+            
+            document.getElementById('safetyModal').style.display = 'flex';
+            document.getElementById('safetyNumber').textContent = 'Generating...';
+            
+            try {
+                const number = await messenger.generateSafetyNumber(currentConversation);
+                document.getElementById('safetyNumber').textContent = number;
+            } catch (error) {
+                document.getElementById('safetyNumber').textContent = 'Failed to generate';
+            }
+        }
+        
+        function closeSafetyModal() {
+            document.getElementById('safetyModal').style.display = 'none';
+        }
+        
+        function verifySafetyNumber() {
+            showStatus('Contact verified ✓');
+            closeSafetyModal();
+        }
+        
+        // Utility Functions
+        function showStatus(message) {
+            const bar = document.getElementById('statusBar');
+            document.getElementById('statusMessage').textContent = message;
+            bar.classList.add('show');
+            setTimeout(() => bar.classList.remove('show'), 3000);
+        }
+        
+        function scrollToBottom() {
+            const container = document.getElementById('messagesContainer');
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('show');
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Keyboard Shortcuts
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && document.activeElement.id === 'messageInput') {
+                sendMessage();
+            }
+            if (e.key === 'Enter' && document.activeElement.id === 'usernameInput') {
+                register();
+            }
+        });
+        
+        // Initialize on load
+        window.addEventListener('load', init);
+    </script>
 </body>
 </html>

@@ -1,51 +1,39 @@
-const { getStore } = require("@netlify/blobs");
-
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-exports.handler = async (event, context) => {
+// netlify/functions/group-operations.js
+export default async (req, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+  if (req.method === 'OPTIONS') {
+    return new Response('', { status: 200, headers });
   }
 
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: 'Method not allowed'
-    };
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...headers, 'Content-Type': 'application/json' }
+    });
   }
 
   try {
-    const { action, groupId, userId, members, metadata } = JSON.parse(event.body);
+    const { getStore } = await import("@netlify/blobs");
+    const body = await req.json();
+    const { action, groupId, userId, members, metadata } = body;
+    
     const groups = getStore("groups");
     
     switch(action) {
       case 'create': {
         if (!userId || !members || !Array.isArray(members)) {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({ error: 'Invalid create request' })
-          };
+          return new Response(JSON.stringify({ error: 'Invalid create request' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
         }
         
-        const newGroupId = generateUUID();
+        const newGroupId = crypto.randomUUID();
         await groups.set(newGroupId, {
           id: newGroupId,
           creator: userId,
@@ -54,35 +42,31 @@ exports.handler = async (event, context) => {
           created: Date.now()
         });
         
-        return {
-          statusCode: 200,
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ 
-            groupId: newGroupId,
-            success: true 
-          })
-        };
+        console.log('Group created:', newGroupId);
+        
+        return new Response(JSON.stringify({ 
+          groupId: newGroupId,
+          success: true 
+        }), {
+          status: 200,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
       }
       
       case 'add-members': {
         if (!groupId || !members || !Array.isArray(members)) {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({ error: 'Invalid add-members request' })
-          };
+          return new Response(JSON.stringify({ error: 'Invalid add-members request' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
         }
         
         const group = await groups.get(groupId);
         if (!group) {
-          return {
-            statusCode: 404,
-            headers,
-            body: JSON.stringify({ error: 'Group not found' })
-          };
+          return new Response(JSON.stringify({ error: 'Group not found' }), {
+            status: 404,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
         }
         
         const newMembers = members.filter(m => !group.members.includes(m));
@@ -90,35 +74,31 @@ exports.handler = async (event, context) => {
         group.lastUpdated = Date.now();
         await groups.set(groupId, group);
         
-        return {
-          statusCode: 200,
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ 
-            success: true,
-            addedMembers: newMembers 
-          })
-        };
+        console.log('Members added to group:', groupId);
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          addedMembers: newMembers 
+        }), {
+          status: 200,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
       }
       
       case 'leave': {
         if (!groupId || !userId) {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({ error: 'Invalid leave request' })
-          };
+          return new Response(JSON.stringify({ error: 'Invalid leave request' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
         }
         
         const group = await groups.get(groupId);
         if (!group) {
-          return {
-            statusCode: 404,
-            headers,
-            body: JSON.stringify({ error: 'Group not found' })
-          };
+          return new Response(JSON.stringify({ error: 'Group not found' }), {
+            status: 404,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
         }
         
         group.members = group.members.filter(m => m !== userId);
@@ -126,64 +106,82 @@ exports.handler = async (event, context) => {
         
         if (group.members.length === 0) {
           await groups.delete(groupId);
+          console.log('Group deleted (empty):', groupId);
         } else {
           await groups.set(groupId, group);
+          console.log('User left group:', userId, groupId);
         }
         
-        return {
-          statusCode: 200,
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ success: true })
-        };
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
       }
       
       case 'get-info': {
         if (!groupId) {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({ error: 'Invalid get-info request' })
-          };
+          return new Response(JSON.stringify({ error: 'Invalid get-info request' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
         }
         
         const group = await groups.get(groupId);
         if (!group) {
-          return {
-            statusCode: 404,
-            headers,
-            body: JSON.stringify({ error: 'Group not found' })
-          };
+          return new Response(JSON.stringify({ error: 'Group not found' }), {
+            status: 404,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
         }
         
-        return {
-          statusCode: 200,
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ group })
-        };
+        return new Response(JSON.stringify({ group }), {
+          status: 200,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      case 'get-message': {
+        if (!groupId || !body.messageId) {
+          return new Response(JSON.stringify({ error: 'Invalid get-message request' }), {
+            status: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const groupMessages = getStore(`group_${groupId}`);
+        const message = await groupMessages.get(body.messageId);
+        
+        if (!message) {
+          return new Response(JSON.stringify({ error: 'Message not found' }), {
+            status: 404,
+            headers: { ...headers, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        return new Response(JSON.stringify({ message }), {
+          status: 200,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
       }
       
       default:
-        return {
-          statusCode: 400,
-          headers,
-          body: JSON.stringify({ error: 'Invalid action' })
-        };
+        return new Response(JSON.stringify({ error: 'Invalid action' }), {
+          status: 400,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
     }
   } catch (error) {
     console.error('Group operation error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Internal server error',
-        details: error.message 
-      })
-    };
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      details: error.message 
+    }), {
+      status: 500,
+      headers: { ...headers, 'Content-Type': 'application/json' }
+    });
   }
+};
+
+export const config = {
+  path: "/.netlify/functions/group-operations"
 };

@@ -1,8 +1,11 @@
-import { getStore } from "@netlify/blobs";
+const { getStore } = require("@netlify/blobs");
 
-export default async (req, context) => {
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+exports.handler = async (event, context) => {
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      body: 'Method not allowed'
+    };
   }
 
   try {
@@ -13,15 +16,20 @@ export default async (req, context) => {
       encryptedContent, 
       ephemeralKey,
       senderKeyId 
-    } = await req.json();
+    } = JSON.parse(event.body);
     
-    // Validate input
     if (!senderId || !encryptedContent) {
-      return new Response('Missing required fields', { status: 400 });
+      return {
+        statusCode: 400,
+        body: 'Missing required fields'
+      };
     }
     
     if (!recipientId && !groupId) {
-      return new Response('Must specify recipient or group', { status: 400 });
+      return {
+        statusCode: 400,
+        body: 'Must specify recipient or group'
+      };
     }
     
     const messageId = crypto.randomUUID();
@@ -39,30 +47,28 @@ export default async (req, context) => {
     };
     
     if (recipientId) {
-      // Direct message - store in recipient's inbox
       const inbox = getStore(`inbox_${recipientId}`);
       await inbox.set(messageId, message);
       
-      // Store in sender's outbox for delivery confirmation
       const outbox = getStore(`outbox_${senderId}`);
       await outbox.set(messageId, {
         ...message,
         delivered: false
       });
     } else if (groupId) {
-      // Group message - store in group's message store
       const groupMessages = getStore(`group_${groupId}`);
       await groupMessages.set(messageId, message);
       
-      // Notify each group member
       const groups = getStore("groups");
       const group = await groups.get(groupId);
       
       if (!group) {
-        return new Response('Group not found', { status: 404 });
+        return {
+          statusCode: 404,
+          body: 'Group not found'
+        };
       }
       
-      // Add to each member's inbox as a notification
       for (const memberId of group.members) {
         if (memberId !== senderId) {
           const memberInbox = getStore(`inbox_${memberId}`);
@@ -76,17 +82,22 @@ export default async (req, context) => {
       }
     }
     
-    return Response.json({ 
-      messageId, 
-      timestamp,
-      success: true 
-    });
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        messageId, 
+        timestamp,
+        success: true 
+      })
+    };
   } catch (error) {
     console.error('Send message error:', error);
-    return new Response('Internal server error', { status: 500 });
+    return {
+      statusCode: 500,
+      body: 'Internal server error'
+    };
   }
-};
-
-export const config = {
-  path: "/.netlify/functions/send-message"
 };

@@ -1,11 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Secure Messenger App</title>
-</head>
-<body>
-<script>
 // Local Database wrapper for IndexedDB
 class LocalDatabase {
   constructor() {
@@ -663,11 +655,3 @@ class SecureMessenger {
     await store.delete(messageId);
   }
 }
-
-// Export for use
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { SecureMessenger, LocalDatabase };
-}
-</script>
-</body>
-</html>

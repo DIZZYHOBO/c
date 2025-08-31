@@ -1,15 +1,5 @@
-const { getStore } = require("@netlify/blobs");
-
-// Simple UUID v4 generator
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-exports.handler = async (event, context) => {
+// Use the v7 API with default export
+export default async (req, context) => {
   // Enable CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -18,51 +8,62 @@ exports.handler = async (event, context) => {
   };
 
   // Handle preflight
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+  if (req.method === 'OPTIONS') {
+    return new Response('', { status: 200, headers });
   }
 
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: 'Method not allowed'
-    };
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers
+    });
   }
 
   try {
-    const body = JSON.parse(event.body);
-    const { username, identityKey, signedPreKey, preKeys } = body;
+    const { getStore } = await import("@netlify/blobs");
+    const body = await req.json();
+    const { 
+      username, 
+      passwordHash,  // Client sends hashed password
+      encryptedPrivateKeys,  // Private keys encrypted with password
+      identityKey, 
+      signedPreKey, 
+      preKeys 
+    } = body;
     
     console.log('Registration attempt for:', username);
     
-    if (!username || !identityKey || !signedPreKey || !preKeys) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Missing required fields' })
-      };
+    if (!username || !passwordHash || !encryptedPrivateKeys || !identityKey || !signedPreKey || !preKeys) {
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+        status: 400,
+        headers
+      });
     }
     
+    // Use Netlify Blobs
     const users = getStore("users");
     const keys = getStore("keys");
+    const accounts = getStore("accounts");
     
     // Check if username exists
     const existingUser = await users.get(username);
     if (existingUser) {
-      return {
-        statusCode: 409,
-        headers,
-        body: JSON.stringify({ error: 'Username already taken' })
-      };
+      return new Response(JSON.stringify({ error: 'Username already taken' }), {
+        status: 409,
+        headers
+      });
     }
     
-    const userId = generateUUID();
+    const userId = crypto.randomUUID();
     const timestamp = Date.now();
+    
+    // Store user account (for login)
+    await accounts.set(username, {
+      id: userId,
+      passwordHash,  // Store hashed password for authentication
+      encryptedPrivateKeys,  // Encrypted private keys for multi-device
+      created: timestamp
+    });
     
     // Store user info
     await users.set(username, {
@@ -70,7 +71,7 @@ exports.handler = async (event, context) => {
       created: timestamp
     });
     
-    // Store public keys
+    // Store public keys for others to use
     await keys.set(userId, {
       identityKey,
       signedPreKey,
@@ -80,27 +81,32 @@ exports.handler = async (event, context) => {
     
     console.log('User registered successfully:', userId);
     
-    return {
-      statusCode: 200,
+    return new Response(JSON.stringify({ 
+      userId, 
+      success: true,
+      timestamp 
+    }), {
+      status: 200,
       headers: {
         ...headers,
         'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ 
-        userId, 
-        success: true,
-        timestamp 
-      })
-    };
+      }
+    });
   } catch (error) {
     console.error('Registration error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Internal server error', 
-        details: error.message 
-      })
-    };
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error', 
+      details: error.message 
+    }), {
+      status: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+      }
+    });
   }
+};
+
+export const config = {
+  path: "/.netlify/functions/register"
 };

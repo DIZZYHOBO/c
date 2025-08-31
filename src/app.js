@@ -1,3 +1,6 @@
+// src/app.js
+// Complete Secure Messenger with Multi-Device Account Support
+
 // Local Database wrapper for IndexedDB
 class LocalDatabase {
   constructor() {
@@ -160,6 +163,34 @@ class LocalDatabase {
     });
   }
   
+  async saveSession(session) {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['settings'], 'readwrite');
+      const store = tx.objectStore('settings');
+      const request = store.put({ key: 'session', ...session });
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+  
+  async getSession() {
+    const tx = this.db.transaction(['settings'], 'readonly');
+    const store = tx.objectStore('settings');
+    return await this.promisifyRequest(store.get('session'));
+  }
+  
+  async clearSession() {
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['settings'], 'readwrite');
+      const store = tx.objectStore('settings');
+      const request = store.delete('session');
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+  
   promisifyRequest(request) {
     return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
@@ -168,12 +199,13 @@ class LocalDatabase {
   }
 }
 
-// Main Secure Messenger class
+// Main Secure Messenger class with Account Support
 class SecureMessenger {
   constructor() {
     this.protocol = null;
     this.userId = null;
     this.username = null;
+    this.passwordKey = null;
     this.db = new LocalDatabase();
     this.pollInterval = null;
     this.currentConversation = null;
@@ -184,15 +216,15 @@ class SecureMessenger {
   async init() {
     await this.db.init();
     
-    // Check if already registered
-    const identity = await this.db.getIdentity();
-    if (identity) {
-      this.userId = identity.userId;
-      this.username = identity.username;
+    // Check if already logged in
+    const session = await this.db.getSession();
+    if (session && session.userId) {
+      this.userId = session.userId;
+      this.username = session.username;
       
-      // Load stored protocol keys
+      // Restore protocol with saved keys
       this.protocol = new SignalProtocol();
-      // In production, restore keys from identity
+      await this.protocol.restoreFromStorage(session.privateKeys);
       
       this.startPolling();
       return true;
@@ -200,10 +232,90 @@ class SecureMessenger {
     return false;
   }
   
-  async register(username) {
+  // Derive encryption key from password
+  async derivePasswordKey(password, salt) {
+    const encoder = new TextEncoder();
+    const passwordData = encoder.encode(password);
+    
+    // Import password as key material
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      passwordData,
+      'PBKDF2',
+      false,
+      ['deriveBits', 'deriveKey']
+    );
+    
+    // Derive key using PBKDF2
+    return await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: salt,
+        iterations: 100000,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      true,
+      ['encrypt', 'decrypt']
+    );
+  }
+  
+  // Hash password for authentication
+  async hashPassword(password, username) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + username);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return btoa(String.fromCharCode(...new Uint8Array(hash)));
+  }
+  
+  // Encrypt private keys with password
+  async encryptPrivateKeys(privateKeys, passwordKey) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(JSON.stringify(privateKeys));
+    
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      passwordKey,
+      encoded
+    );
+    
+    return {
+      iv: btoa(String.fromCharCode(...iv)),
+      data: btoa(String.fromCharCode(...new Uint8Array(encrypted)))
+    };
+  }
+  
+  // Decrypt private keys with password
+  async decryptPrivateKeys(encryptedKeys, passwordKey) {
+    const iv = Uint8Array.from(atob(encryptedKeys.iv), c => c.charCodeAt(0));
+    const data = Uint8Array.from(atob(encryptedKeys.data), c => c.charCodeAt(0));
+    
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      passwordKey,
+      data
+    );
+    
+    const decoded = new TextDecoder().decode(decrypted);
+    return JSON.parse(decoded);
+  }
+  
+  async register(username, password) {
     // Initialize Signal Protocol
     this.protocol = new SignalProtocol();
     const keys = await this.protocol.initialize();
+    
+    // Derive password key for encrypting private keys
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const passwordKey = await this.derivePasswordKey(password, salt);
+    const passwordHash = await this.hashPassword(password, username);
+    
+    // Get private keys from protocol
+    const privateKeys = await this.protocol.exportPrivateKeys();
+    
+    // Encrypt private keys with password
+    const encryptedPrivateKeys = await this.encryptPrivateKeys(privateKeys, passwordKey);
     
     // Register with server
     const response = await fetch('/.netlify/functions/register', {
@@ -211,30 +323,96 @@ class SecureMessenger {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         username,
+        passwordHash,
+        encryptedPrivateKeys: {
+          ...encryptedPrivateKeys,
+          salt: btoa(String.fromCharCode(...salt))
+        },
         ...keys
       })
     });
     
     if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Registration failed: ${text}`);
+      const error = await response.json();
+      throw new Error(error.error || 'Registration failed');
     }
     
     const { userId } = await response.json();
     this.userId = userId;
     this.username = username;
+    this.passwordKey = passwordKey;
     
-    // Save identity locally
-    await this.db.saveIdentity({
+    // Save session locally
+    await this.db.saveSession({
       userId,
       username,
-      registeredAt: Date.now()
+      privateKeys,
+      salt: btoa(String.fromCharCode(...salt))
     });
     
     // Start polling for messages
     this.startPolling();
     
     return userId;
+  }
+  
+  async login(username, password) {
+    // Hash password for authentication
+    const passwordHash = await this.hashPassword(password, username);
+    
+    // Login to server
+    const response = await fetch('/.netlify/functions/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username,
+        passwordHash
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Login failed');
+    }
+    
+    const { userId, encryptedPrivateKeys, publicKeys } = await response.json();
+    
+    // Derive password key
+    const salt = Uint8Array.from(atob(encryptedPrivateKeys.salt), c => c.charCodeAt(0));
+    const passwordKey = await this.derivePasswordKey(password, salt);
+    
+    // Decrypt private keys
+    const privateKeys = await this.decryptPrivateKeys(encryptedPrivateKeys, passwordKey);
+    
+    // Restore Signal Protocol with keys
+    this.protocol = new SignalProtocol();
+    await this.protocol.restoreFromKeys(privateKeys, publicKeys);
+    
+    this.userId = userId;
+    this.username = username;
+    this.passwordKey = passwordKey;
+    
+    // Save session locally
+    await this.db.saveSession({
+      userId,
+      username,
+      privateKeys,
+      salt: btoa(String.fromCharCode(...salt))
+    });
+    
+    // Start polling for messages
+    this.startPolling();
+    
+    return userId;
+  }
+  
+  async logout() {
+    this.stopPolling();
+    await this.db.clearSession();
+    this.userId = null;
+    this.username = null;
+    this.protocol = null;
+    this.passwordKey = null;
   }
   
   async sendMessage(recipientId, text, options = {}) {
@@ -270,6 +448,15 @@ class SecureMessenger {
         timestamp,
         delivered: false,
         read: false
+      });
+      
+      // Save conversation if new
+      await this.db.saveConversation({
+        id: recipientId,
+        name: recipientId,
+        lastMessage: text,
+        lastMessageTime: timestamp,
+        unreadCount: 0
       });
       
       return { messageId, timestamp };
@@ -340,8 +527,6 @@ class SecureMessenger {
       // For each member, encrypt the group key with their public key
       const memberIds = [];
       for (const username of memberUsernames) {
-        // In production, fetch user ID from username
-        // For now, we'll use username as ID
         memberIds.push(username);
         
         // Send encrypted group key via 1-1 message
@@ -533,6 +718,15 @@ class SecureMessenger {
             received: true,
             timestamp: message.timestamp,
             read: false
+          });
+          
+          // Update conversation
+          await this.db.saveConversation({
+            id: message.senderId,
+            name: message.senderId,
+            lastMessage: parsedMessage,
+            lastMessageTime: message.timestamp,
+            unreadCount: 1
           });
           
           // Notify UI

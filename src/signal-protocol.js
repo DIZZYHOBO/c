@@ -1,4 +1,5 @@
-// Complete Signal Protocol Implementation
+// src/signal-protocol.js
+// Complete Signal Protocol Implementation with Multi-Device Support
 class SignalProtocolStore {
   constructor() {
     this.store = {};
@@ -118,6 +119,87 @@ class SignalProtocol {
       signedPreKey,
       preKeys
     };
+  }
+  
+  // Export private keys for multi-device support
+  async exportPrivateKeys() {
+    return {
+      identityKeyPair: await this.exportKeyPair(this.identityKeyPair),
+      signedPreKey: {
+        keyId: this.signedPreKey.keyId,
+        keyPair: await this.exportKeyPair(this.signedPreKey.keyPair),
+        signature: this.signedPreKey.signature,
+        timestamp: this.signedPreKey.timestamp
+      },
+      preKeys: await Promise.all(this.preKeys.map(async pk => ({
+        keyId: pk.keyId,
+        keyPair: await this.exportKeyPair(pk.keyPair)
+      })))
+    };
+  }
+  
+  // Restore from exported private keys (for login on new device)
+  async restoreFromKeys(privateKeys, publicKeys) {
+    // Restore identity key pair
+    this.identityKeyPair = await this.importKeyPair(privateKeys.identityKeyPair);
+    
+    // Restore signed pre key
+    this.signedPreKey = {
+      keyId: privateKeys.signedPreKey.keyId,
+      keyPair: await this.importKeyPair(privateKeys.signedPreKey.keyPair),
+      signature: privateKeys.signedPreKey.signature,
+      timestamp: privateKeys.signedPreKey.timestamp
+    };
+    
+    // Restore pre keys
+    this.preKeys = await Promise.all(privateKeys.preKeys.map(async pk => ({
+      keyId: pk.keyId,
+      keyPair: await this.importKeyPair(pk.keyPair)
+    })));
+    
+    // Store in IndexedDB for local use
+    await this.storeIdentity();
+  }
+  
+  // Restore from local storage
+  async restoreFromStorage(storedData) {
+    if (storedData.identityKeyPair) {
+      this.identityKeyPair = await this.importKeyPair(storedData.identityKeyPair);
+    }
+    if (storedData.signedPreKey) {
+      this.signedPreKey = {
+        keyId: storedData.signedPreKey.keyId,
+        keyPair: await this.importKeyPair(storedData.signedPreKey.keyPair),
+        signature: storedData.signedPreKey.signature,
+        timestamp: storedData.signedPreKey.timestamp
+      };
+    }
+    if (storedData.preKeys) {
+      this.preKeys = await Promise.all(storedData.preKeys.map(async pk => ({
+        keyId: pk.keyId,
+        keyPair: await this.importKeyPair(pk.keyPair)
+      })));
+    }
+  }
+  
+  async importKeyPair(exportedKeyPair) {
+    const publicKey = await crypto.subtle.importKey(
+      "jwk",
+      exportedKeyPair.publicKey,
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      []
+    );
+    
+    const privateKey = await crypto.subtle.importKey(
+      "jwk",
+      exportedKeyPair.privateKey,
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      ["deriveKey", "deriveBits"]
+    );
+    
+    return { publicKey, privateKey };
   }
   
   async buildSession(recipientId, recipientKeys) {

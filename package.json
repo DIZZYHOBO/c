@@ -1,14 +1,13 @@
 {
   "name": "signal-clone",
   "version": "1.0.0",
-  "description": "E2E encrypted messaging app",
+  "description": "E2E encrypted messaging app with multi-device support",
   "scripts": {
     "dev": "netlify dev",
     "build": "echo 'No build needed'"
   },
   "dependencies": {
-    "@netlify/blobs": "^7.0.0",
-    "@netlify/functions": "^2.0.0"
+    "@netlify/blobs": "^7.0.0"
   },
   "devDependencies": {
     "netlify-cli": "^17.0.0"

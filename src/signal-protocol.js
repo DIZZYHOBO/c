@@ -376,12 +376,8 @@ class SignalProtocol {
   }
   
   async storeIdentity() {
-    // Store in IndexedDB
-    const db = await this.openDB();
-    const tx = db.transaction(['identity'], 'readwrite');
-    const store = tx.objectStore('identity');
-    
-    await store.put({
+    // Prepare data before opening transaction
+    const identityData = {
       id: 'self',
       identityKeyPair: await this.exportKeyPair(this.identityKeyPair),
       signedPreKey: {
@@ -394,6 +390,22 @@ class SignalProtocol {
         keyId: pk.keyId,
         keyPair: await this.exportKeyPair(pk.keyPair)
       })))
+    };
+    
+    // Store in IndexedDB
+    const db = await this.openDB();
+    
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['identity'], 'readwrite');
+      const store = tx.objectStore('identity');
+      
+      const request = store.put(identityData);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+      
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
     });
   }
   

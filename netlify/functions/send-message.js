@@ -1,63 +1,50 @@
-const { getStore } = require("@netlify/blobs");
-
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-exports.handler = async (event, context) => {
+// netlify/functions/send-message.js
+export default async (req, context) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: ''
-    };
+  if (req.method === 'OPTIONS') {
+    return new Response('', { status: 200, headers });
   }
 
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: 'Method not allowed'
-    };
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...headers, 'Content-Type': 'application/json' }
+    });
   }
 
   try {
+    const { getStore } = await import("@netlify/blobs");
+    const body = await req.json();
     const { 
       senderId, 
       recipientId, 
       groupId, 
       encryptedContent, 
       ephemeralKey,
+      mac,
       senderKeyId 
-    } = JSON.parse(event.body);
+    } = body;
     
     if (!senderId || !encryptedContent) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Missing required fields' })
-      };
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+        status: 400,
+        headers: { ...headers, 'Content-Type': 'application/json' }
+      });
     }
     
     if (!recipientId && !groupId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Must specify recipient or group' })
-      };
+      return new Response(JSON.stringify({ error: 'Must specify recipient or group' }), {
+        status: 400,
+        headers: { ...headers, 'Content-Type': 'application/json' }
+      });
     }
     
-    const messageId = generateUUID();
+    const messageId = crypto.randomUUID();
     const timestamp = Date.now();
     
     const message = {
@@ -67,34 +54,41 @@ exports.handler = async (event, context) => {
       groupId,
       encryptedContent,
       ephemeralKey,
+      mac,
       senderKeyId,
       timestamp
     };
     
     if (recipientId) {
+      // Direct message
       const inbox = getStore(`inbox_${recipientId}`);
       await inbox.set(messageId, message);
       
+      // Store in sender's outbox for delivery confirmation
       const outbox = getStore(`outbox_${senderId}`);
       await outbox.set(messageId, {
         ...message,
         delivered: false
       });
+      
+      console.log('Direct message sent:', messageId);
     } else if (groupId) {
+      // Group message
       const groupMessages = getStore(`group_${groupId}`);
       await groupMessages.set(messageId, message);
       
+      // Get group members
       const groups = getStore("groups");
       const group = await groups.get(groupId);
       
       if (!group) {
-        return {
-          statusCode: 404,
-          headers,
-          body: JSON.stringify({ error: 'Group not found' })
-        };
+        return new Response(JSON.stringify({ error: 'Group not found' }), {
+          status: 404,
+          headers: { ...headers, 'Content-Type': 'application/json' }
+        });
       }
       
+      // Notify each member (except sender)
       for (const memberId of group.members) {
         if (memberId !== senderId) {
           const memberInbox = getStore(`inbox_${memberId}`);
@@ -106,29 +100,30 @@ exports.handler = async (event, context) => {
           });
         }
       }
+      
+      console.log('Group message sent:', messageId);
     }
     
-    return {
-      statusCode: 200,
-      headers: {
-        ...headers,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ 
-        messageId, 
-        timestamp,
-        success: true 
-      })
-    };
+    return new Response(JSON.stringify({ 
+      messageId, 
+      timestamp,
+      success: true 
+    }), {
+      status: 200,
+      headers: { ...headers, 'Content-Type': 'application/json' }
+    });
   } catch (error) {
     console.error('Send message error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Internal server error',
-        details: error.message 
-      })
-    };
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      details: error.message 
+    }), {
+      status: 500,
+      headers: { ...headers, 'Content-Type': 'application/json' }
+    });
   }
+};
+
+export const config = {
+  path: "/.netlify/functions/send-message"
 };

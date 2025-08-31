@@ -1,9 +1,32 @@
 const { getStore } = require("@netlify/blobs");
 
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 exports.handler = async (event, context) => {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: ''
+    };
+  }
+
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
+      headers,
       body: 'Method not allowed'
     };
   }
@@ -21,18 +44,20 @@ exports.handler = async (event, context) => {
     if (!senderId || !encryptedContent) {
       return {
         statusCode: 400,
-        body: 'Missing required fields'
+        headers,
+        body: JSON.stringify({ error: 'Missing required fields' })
       };
     }
     
     if (!recipientId && !groupId) {
       return {
         statusCode: 400,
-        body: 'Must specify recipient or group'
+        headers,
+        body: JSON.stringify({ error: 'Must specify recipient or group' })
       };
     }
     
-    const messageId = crypto.randomUUID();
+    const messageId = generateUUID();
     const timestamp = Date.now();
     
     const message = {
@@ -65,7 +90,8 @@ exports.handler = async (event, context) => {
       if (!group) {
         return {
           statusCode: 404,
-          body: 'Group not found'
+          headers,
+          body: JSON.stringify({ error: 'Group not found' })
         };
       }
       
@@ -85,6 +111,7 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 200,
       headers: {
+        ...headers,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ 
@@ -97,7 +124,11 @@ exports.handler = async (event, context) => {
     console.error('Send message error:', error);
     return {
       statusCode: 500,
-      body: 'Internal server error'
+      headers,
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        details: error.message 
+      })
     };
   }
 };

@@ -1,42 +1,55 @@
-import { getStore } from "@netlify/blobs";
+const { getStore } = require("@netlify/blobs");
 
-export default async (req, context) => {
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+exports.handler = async (event, context) => {
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      body: 'Method not allowed'
+    };
   }
 
   try {
-    const { userId } = await req.json();
+    const { userId } = JSON.parse(event.body);
     
     if (!userId) {
-      return new Response('Missing userId', { status: 400 });
+      return {
+        statusCode: 400,
+        body: 'Missing userId'
+      };
     }
     
     const keys = getStore("keys");
     const userKeys = await keys.get(userId);
     
     if (!userKeys) {
-      return new Response('User not found', { status: 404 });
+      return {
+        statusCode: 404,
+        body: 'User not found'
+      };
     }
     
-    // Remove a prekey (one-time use)
     let preKey = null;
     if (userKeys.preKeys && userKeys.preKeys.length > 0) {
       preKey = userKeys.preKeys.shift();
       await keys.set(userId, userKeys);
     }
     
-    return Response.json({
-      identityKey: userKeys.identityKey,
-      signedPreKey: userKeys.signedPreKey,
-      preKey: preKey
-    });
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        identityKey: userKeys.identityKey,
+        signedPreKey: userKeys.signedPreKey,
+        preKey: preKey
+      })
+    };
   } catch (error) {
     console.error('Get keys error:', error);
-    return new Response('Internal server error', { status: 500 });
+    return {
+      statusCode: 500,
+      body: 'Internal server error'
+    };
   }
-};
-
-export const config = {
-  path: "/.netlify/functions/get-keys"
 };

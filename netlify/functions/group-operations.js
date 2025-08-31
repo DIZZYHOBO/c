@@ -1,9 +1,32 @@
 const { getStore } = require("@netlify/blobs");
 
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 exports.handler = async (event, context) => {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: ''
+    };
+  }
+
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
+      headers,
       body: 'Method not allowed'
     };
   }
@@ -17,11 +40,12 @@ exports.handler = async (event, context) => {
         if (!userId || !members || !Array.isArray(members)) {
           return {
             statusCode: 400,
-            body: 'Invalid create request'
+            headers,
+            body: JSON.stringify({ error: 'Invalid create request' })
           };
         }
         
-        const newGroupId = crypto.randomUUID();
+        const newGroupId = generateUUID();
         await groups.set(newGroupId, {
           id: newGroupId,
           creator: userId,
@@ -33,6 +57,7 @@ exports.handler = async (event, context) => {
         return {
           statusCode: 200,
           headers: {
+            ...headers,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ 
@@ -46,7 +71,8 @@ exports.handler = async (event, context) => {
         if (!groupId || !members || !Array.isArray(members)) {
           return {
             statusCode: 400,
-            body: 'Invalid add-members request'
+            headers,
+            body: JSON.stringify({ error: 'Invalid add-members request' })
           };
         }
         
@@ -54,7 +80,8 @@ exports.handler = async (event, context) => {
         if (!group) {
           return {
             statusCode: 404,
-            body: 'Group not found'
+            headers,
+            body: JSON.stringify({ error: 'Group not found' })
           };
         }
         
@@ -66,6 +93,7 @@ exports.handler = async (event, context) => {
         return {
           statusCode: 200,
           headers: {
+            ...headers,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ 
@@ -79,7 +107,8 @@ exports.handler = async (event, context) => {
         if (!groupId || !userId) {
           return {
             statusCode: 400,
-            body: 'Invalid leave request'
+            headers,
+            body: JSON.stringify({ error: 'Invalid leave request' })
           };
         }
         
@@ -87,7 +116,8 @@ exports.handler = async (event, context) => {
         if (!group) {
           return {
             statusCode: 404,
-            body: 'Group not found'
+            headers,
+            body: JSON.stringify({ error: 'Group not found' })
           };
         }
         
@@ -103,6 +133,7 @@ exports.handler = async (event, context) => {
         return {
           statusCode: 200,
           headers: {
+            ...headers,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ success: true })
@@ -113,7 +144,8 @@ exports.handler = async (event, context) => {
         if (!groupId) {
           return {
             statusCode: 400,
-            body: 'Invalid get-info request'
+            headers,
+            body: JSON.stringify({ error: 'Invalid get-info request' })
           };
         }
         
@@ -121,13 +153,15 @@ exports.handler = async (event, context) => {
         if (!group) {
           return {
             statusCode: 404,
-            body: 'Group not found'
+            headers,
+            body: JSON.stringify({ error: 'Group not found' })
           };
         }
         
         return {
           statusCode: 200,
           headers: {
+            ...headers,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ group })
@@ -137,8 +171,19 @@ exports.handler = async (event, context) => {
       default:
         return {
           statusCode: 400,
-          body: 'Invalid action'
+          headers,
+          body: JSON.stringify({ error: 'Invalid action' })
         };
     }
   } catch (error) {
-    console.error('Group operation error:
+    console.error('Group operation error:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        details: error.message 
+      })
+    };
+  }
+};

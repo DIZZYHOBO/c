@@ -50,9 +50,17 @@ class LocalDatabase {
   }
   
   async saveIdentity(data) {
-    const tx = this.db.transaction(['identity'], 'readwrite');
-    const store = tx.objectStore('identity');
-    await store.put({ id: 'self', ...data });
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['identity'], 'readwrite');
+      const store = tx.objectStore('identity');
+      const request = store.put({ id: 'self', ...data });
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+      
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
   }
   
   async getIdentity() {
@@ -62,11 +70,15 @@ class LocalDatabase {
   }
   
   async saveMessage(message) {
-    const tx = this.db.transaction(['messages'], 'readwrite');
-    const store = tx.objectStore('messages');
-    message.id = message.id || crypto.randomUUID();
-    await store.put(message);
-    return message.id;
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['messages'], 'readwrite');
+      const store = tx.objectStore('messages');
+      message.id = message.id || crypto.randomUUID();
+      const request = store.put(message);
+      
+      request.onsuccess = () => resolve(message.id);
+      request.onerror = () => reject(request.error);
+    });
   }
   
   async getMessages(conversationId, limit = 50) {
@@ -91,9 +103,14 @@ class LocalDatabase {
   }
   
   async saveConversation(conversation) {
-    const tx = this.db.transaction(['conversations'], 'readwrite');
-    const store = tx.objectStore('conversations');
-    await store.put(conversation);
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['conversations'], 'readwrite');
+      const store = tx.objectStore('conversations');
+      const request = store.put(conversation);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
   }
   
   async getConversations() {
@@ -103,9 +120,14 @@ class LocalDatabase {
   }
   
   async saveGroup(group) {
-    const tx = this.db.transaction(['groups'], 'readwrite');
-    const store = tx.objectStore('groups');
-    await store.put(group);
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['groups'], 'readwrite');
+      const store = tx.objectStore('groups');
+      const request = store.put(group);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
   }
   
   async getGroup(groupId) {
@@ -128,9 +150,14 @@ class LocalDatabase {
   }
   
   async setLastSync(timestamp) {
-    const tx = this.db.transaction(['settings'], 'readwrite');
-    const store = tx.objectStore('settings');
-    await store.put({ key: 'lastSync', value: timestamp });
+    return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['settings'], 'readwrite');
+      const store = tx.objectStore('settings');
+      const request = store.put({ key: 'lastSync', value: timestamp });
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
   }
   
   promisifyRequest(request) {
@@ -650,8 +677,13 @@ class SecureMessenger {
   
   async deleteMessage(messageId) {
     // Delete from local database
-    const tx = this.db.db.transaction(['messages'], 'readwrite');
-    const store = tx.objectStore('messages');
-    await store.delete(messageId);
+    return new Promise((resolve, reject) => {
+      const tx = this.db.db.transaction(['messages'], 'readwrite');
+      const store = tx.objectStore('messages');
+      const request = store.delete(messageId);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
   }
 }

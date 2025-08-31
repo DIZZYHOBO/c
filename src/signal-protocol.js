@@ -1,11 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Signal Protocol Implementation</title>
-</head>
-<body>
-<script>
 // Complete Signal Protocol Implementation
 class SignalProtocolStore {
   constructor() {
@@ -530,11 +522,3 @@ class Session {
     );
   }
 }
-
-// Export for use in other files
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { SignalProtocol, SignalProtocolStore, Session };
-}
-</script>
-</body>
-</html>

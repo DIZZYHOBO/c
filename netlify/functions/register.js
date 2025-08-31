@@ -1,37 +1,42 @@
-import { getStore } from "@netlify/blobs";
+const { getStore } = require("@netlify/blobs");
 
-export default async (req, context) => {
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+exports.handler = async (event, context) => {
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      body: 'Method not allowed'
+    };
   }
 
   try {
-    const { username, identityKey, signedPreKey, preKeys } = await req.json();
+    const { username, identityKey, signedPreKey, preKeys } = JSON.parse(event.body);
     
-    // Validate input
     if (!username || !identityKey || !signedPreKey || !preKeys) {
-      return new Response('Missing required fields', { status: 400 });
+      return {
+        statusCode: 400,
+        body: 'Missing required fields'
+      };
     }
     
     const users = getStore("users");
     const keys = getStore("keys");
     
-    // Check if username exists
     const existingUser = await users.get(username);
     if (existingUser) {
-      return new Response('Username already taken', { status: 409 });
+      return {
+        statusCode: 409,
+        body: 'Username already taken'
+      };
     }
     
     const userId = crypto.randomUUID();
     const timestamp = Date.now();
     
-    // Store user info
     await users.set(username, {
       id: userId,
       created: timestamp
     });
     
-    // Store public keys for key exchange
     await keys.set(userId, {
       identityKey,
       signedPreKey,
@@ -39,17 +44,22 @@ export default async (req, context) => {
       lastUpdated: timestamp
     });
     
-    return Response.json({ 
-      userId, 
-      success: true,
-      timestamp 
-    });
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        userId, 
+        success: true,
+        timestamp 
+      })
+    };
   } catch (error) {
     console.error('Registration error:', error);
-    return new Response('Internal server error', { status: 500 });
+    return {
+      statusCode: 500,
+      body: 'Internal server error'
+    };
   }
-};
-
-export const config = {
-  path: "/.netlify/functions/register"
 };
